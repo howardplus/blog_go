@@ -62,7 +62,7 @@ int main()
 
 Go's **io.Reader** and **io.Writer** are similar to C++'s iostream in the sense that they provide standard I/O interface. But they are not containers. This means that you do not wrap standard I/O inside a container structure, such as **istream_iterator**, before they can be used by the **copy()** function. 
 
-In Go, the built-in **copy()** function directly runs on **io.Reader** and **io.Writer** interfaces, so that piping data from standard input to output can be succinctly done as follows:
+In Go, the built-in **copy()** function, which copy from source to destination, takes **io.Writer** and **io.Reader** interfaces. This makes piping data from standard input to output much more succinctly:
 
 {{<highlight go>}}
 // example 1: directly copy from stdin to stdout
@@ -76,9 +76,9 @@ func main() {
 }
 {{</highlight>}}
 
-This blocks the main thread until an EOF has been reached. On a unix environment, you can press "ctrl-D" to simulate EOF from the console.
+This code blocks the main thread until an EOF has been reached. In Unix environment, you can press "ctrl-D" to simulate EOF from the console.
 
-Go's generic buffer struct **bytes.Buffer** conveniently implements the **io.Reader** and **io.Writer** interfaces, so you can use that as a temporary buffer:
+Go's generic buffer struct **bytes.Buffer** conveniently implements **io.Reader** and **io.Writer** interfaces, so you can use that as a temporary buffer:
 
 {{<highlight go>}}
 // example 2: copy from stdin to stdout using a temporary buffer
@@ -89,11 +89,13 @@ func main() {
 }
 {{</highlight>}}
 
-Since all the data are written to the temporary buffer, your input will not echo on the screen. It is only when you enter "Ctrl-D", or EOF, that all the inputs will be displayed on the screen all at once.
+Since all the data are written to the temporary buffer, your inputs do not immediately echo on the screen. It is only when you enter "Ctrl-D", or EOF, that all the inputs will be echoed on the screen all at once.
 
-This is slightly different in the way that input is **buffered** into a temporary space. If you want to echo input to the console, this code won't work.
+This is slightly different in the way that input is **buffered** into a temporary space. If your goal is to echo input to the console, this code won't work.
 
-Go also implements an in-memory pipe: **io.Pipe()**. What comes into the pipe must come out exactly as it was. We can reimplement the copy this way:
+Let's see how we can do that using **io.Pipe()**.
+
+An **io.Pipe()** is an in-memory data pipe. What comes into the pipe must come out exactly as it was. To achieve immediate echo, we can therefore do the folllowing:
 
 {{<highlight go>}}
 // example 3: copy from stdin to stdout using a pipe
@@ -106,7 +108,7 @@ func main() {
 }
 {{</highlight>}}
 
-This is a complicated way to implement a simple task. But it enables us to insert a function that operates on the data between input and output.
+This is a slightly complicated way to implement such a simple task. But it serves as a generic framework that transform data between input and output.
 
 Suppose that we want to format the output using JSON format, with the timestamp of the user input. The output should look like the following:
 
@@ -131,26 +133,26 @@ type MyInput struct {
 }
 {{</highlight>}}
 
-To encode the object "u" into JSON format, and send the output to an **io.Writer** "w", you can use the following code snippet:
+Now let's create an object of type **MyInput**, and feed some bogus data to **UserInput**. To encode this object into JSON format, and send the output to any **io.Writer** interface, you do the following:
 
 {{<highlight go>}}
 u := MyInput{UserInput: "some string", Timestamp: time.Now()}
 json.NewEncoder(w).Encode(u)
 {{</highlight>}}
 
-The first line simply creates an object of "MyInput", with some arbitrary text. The second line creates a JSON encoder object using the function "NewEncoder()", specify the output stream, and encode the data from the object "u".
+The first line simply creates an object of "MyInput", with some arbitrary text. The second line creates a JSON encoder object "NewEncoder()" with underlying **io.Writer** where the encoded data will be written to.
 
-Remember our goal is to convert the console input, insert the data into the "UserInput" field of the JSON template. To do so, we need to read from the receiving end of the pipe. To read from the receiving end, which is an **io.Reader**, we can either loop until EOF, or use the **ioutil**'s **ReadAll** function:
+Remember our goal is to convert the console input into JSON format with timestamp specifying the input time. To do so, we need to read from the receiving end of the pipe. The receiving end is an **io.Reader**. We can either read until EOF, or simply use the **ioutil**'s **ReadAll** function:
 
 {{<highlight go>}}
 b, _ := ioutil.ReadAll(r) // "r" is the read end of the pipe
 {{</highlight>}}
 
-This utility function reads all the way until EOF, and returns a byte slice with error. Let's ignore the error for now. The output "b" now contains the byte slice of all the data from the pipe.
+This utility function reads all the data until EOF, and returns a byte slice with error. Let's ignore the error for now. The output "b" now contains the byte slice of all the data from the pipe.
 
-Notice that a pipe does not automatically send the EOF from the console to the pipe; to send EOF on the pipe, you need to explicitly close the pipe on the write end.
+Notice that a pipe does not automatically send the EOF from the console to the pipe; to send EOF on the pipe, you need to explicitly close the writer end of the pipe.
 
-Now we have everything we need, let's rewrite the code to encode the console input, and write the JSON formatted output to the console output:
+Now we have everything we need, let's rewrite the code to encode the console input, and write the JSON-formatted output to the console output:
 
 {{<highlight go>}}
 type MyInput struct {
@@ -185,7 +187,7 @@ Running this code with a single line input "12345", and press "Ctrl-D" to end th
 
     {"UserInput":"12345\n","Timestamp":"2016-11-02T04:39:42.887672059Z"}
 
-There it is. We used a pipe to send data from standard input to output with extra processing logic.
+That's it. We can now use a pipe to transform data from standard input to output.
 
 ### File I/O
 
@@ -216,9 +218,109 @@ Now run this code again with "12345" as input, you would have the output written
 
 Another breed of I/O is network I/O. While networking may be too big a topic to cover here, we attempt to shed some lights on how to perform basic network operations using Go.
 
-In network applications where bandwidth is a critical resource, you may want to consider using binary protocol. A binary protocol is one where data is not represented in plain-text format, like JSON.
+Althought web programming has been getting a lot of attentions these days, it is not the only form of network programming. Network programming fundamentally involves transfer of bits and bytes over the network. Although it is possible to use the web protocol, or HTTP, for all network communications, most performance critical network applications use "binary protocol".
 
-Go supports a native binary protocol package called **encoding/gob**. The GOB Package contains encoding and decoding methods, where encoding prepares for data to be sent to the network, while decoding interprets data received from the network:
+A binary protocol is one where data is not represented in plain-text format, like JSON. A binary protocol does not provide privacy; it simply isn't represented as human readable string.
 
-    struct -> gob.Encode(r io.Reader) -> to network
-    from network -> gob.Decode(w io.Writer) -> struct
+Go natively supports a binary protocol package called **encoding/gob**. The GOB Package contains encoding and decoding methods, where encoding prepares for data to be sent to the network, while decoding interprets data received from the network:
+
+    struct -> gob.Encode -> to network
+    from network -> gob.Decoder -> struct
+
+With GOB, encoding and decoding refers to the data in the network, or the "on-the-wire" data. Therefore, encoding converts an object into data ready for transmission; while decoding converts the data read from the newtork to a data structure.
+
+Like JSON, the GOB encoder/decoder supports utility functions **NewEncoder(io.Writer)** and **NewDecoder(io.Reader)**. This hides the details of how bits and bytes appear on the wire.
+
+To demonstrate network I/O, we need to first introduce the "net" package. This package contains the socket API in Go.
+
+A simple server application can be created using the following code snippet:
+
+{{<highlight go>}}
+func main() {
+    port := "9999"
+    ln, err := net.Listen("tcp", "127.0.0.1:"+port)
+    if err != nil {
+        return
+    }
+    defer ln.Close()
+    for {
+        conn, err := ln.Accept()
+        if err != nil {
+            go handleConnection(conn)
+        }
+    }
+}
+{{</highlight>}}
+
+There are a few things to note here:
+
+1. The single **net.Listen()** function call encapsulates the typical C's **socket()**, **bind()** and **listen()** functions.
+* **net.Listen()** always use a default backlog size equal to system maximum.
+* Socket type (TCP or UDP), IP address and ports are all passed in as **string**.
+
+This simplifies things quite a bit, but it also raises a few concerns about lack of fine-tuning necessary on more complex network applications.
+
+Fortunately for the more advanced network programmers, the native socket API's are still available via **syscall** package. This package contains a lot of low level API's, including the socket API's. Some of the examples in the **syscall** package are **syscall.Socket()**, **syscall.Bind()**, **syscall.Setsockopt**, etc. This obviously gives you complete control of the socket, but at the same time make things a bit more complicated.
+
+Back to our server application. The application listens on the localhost port 9999, accept the connection and starts a goroutine to handle the connection. Since the data comes from the network, we will need to **decode** it using GOB decoder. This is what the function **handleConnection()** looks like:
+
+{{<highlight go>}}
+func handleConnection(conn net.Conn) {
+    defer conn.Close()
+    var m MyInput
+    if err := gob.NewDecoder(conn).Decode(&m); err != nil {
+        if err.Error() != "EOF" {
+            fmt.Printf("error decoding from %s, err=%s\n",
+                conn.RemoteAddr().String(), err.Error())
+            return
+        }
+    }
+    fmt.Printf("input = %s\ntime = %s\n", m.UserInput, m.Timestampe.String())
+}
+{{</highlight>}}
+
+Here we are reusing the data struct **MyInput**, which contains a **UserInput** and **Timestamp**. To decode from the wire, we pass a **net.Conn** to a GOB decoder, and decode the data into the object **m**.
+
+Now let's take a look at how to create the client application. The client takes input from the console, connect to the server and transfer the input using GOB encoder. The client code is shown below:
+
+{{<highlight go>}}
+func main() {
+    var wg sync.WaitGroup
+    r, w := io.Pipe()
+
+    port := "9999"
+    conn, err := net.Dial("tcp", "127.0.0.1:"+port)
+    if err != nil {
+        return
+    }
+    defer conn.Close()
+
+    go func(w io.Writer) {
+        wg.Add(1)
+        defer wg.Done()
+        defer r.Close()
+
+        b, _ := ioutil.ReadAll(r)
+    
+        m := &MyInput{UserInput: string(b), Timestamp: time.Now()}
+        gob.NewEncoder(w).Encode(m)
+    }(conn)
+
+    io.Copy(w, os.Stdin)
+    w.Close()
+
+    wg.Wait()
+}
+{{</highlight>}}
+
+The **net.Dial** function replaces the **socket()** and **connect()** function in C, and just like **net.Listen()**, the socket type, destination address and port are all passed in as string. Once the connection is established, the rest of the code looks strangely similar to the code above when we were encoding the input into JSON format. Whether you are working on console I/O, file I/O, or network I/O, once the endpoint is established, they all support **io.Reader** and **io.Writer** interfaces, which makes the rest of the code around it consistent.
+
+Now if you run the client application with a single line input:
+
+    test string<ctrl-d>
+
+You should be able to see the input string reflected on the server:
+
+    input = test string
+    time = 2016-12-15 00:09:54.727447929 +0000 UTC
+
