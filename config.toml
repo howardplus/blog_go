@@ -20,7 +20,7 @@ disqusShortname = ""
     url = "https://twitter.com/hctw6"
 
 [params]
-    description = ""
+    description = "Learning Go: A C Programmer's Perspective"
 
     [params.logo]
     url = "logo_hc.png"
