@@ -26,7 +26,7 @@ Running this code results in the following error:
 
 	cannot use a1 (type [3]int) as type [4]int in assignment
 
-With C, this is allowed, and the assignment **a[3] = 0** will result in buffer overflow:
+With C, this is syntactically allowed, but the assignment **a[3] = 0** results in buffer overflow:
 
 {{<highlight c>}}
 void foo(int a[])
@@ -46,7 +46,7 @@ Here, the parameter **a** of function **foo** loses its length information insid
 
 We have said that the length of an array is part of the data type, so it is not difficult for Go compiler to detect an out-of-range array index. In fact, you are forbidden from accessing an array element outside of the allowable range.
 
-Consider the following code snippet:
+Consider the following:
 
 {{<highlight go>}}
 a1 := [3]int{1, 2, 3}
@@ -69,13 +69,16 @@ Why not just omit the number from within the square brackets? Well, that's reser
 
 A slice takes a segment of an array to form a dynamic array, where its length may be expanded when needed. A slice data type contains 3 components: memory location, length of slice, and the capacility of the slice. You can use the built-in function **len()** to get the length of the slice, and use **cap()** to get the capacity.
 
-Syntactically, a slice is very similar to an array, except for the length part:
+Syntactically, a slice is very similar to an array:
 
 {{<highlight go>}}
 var s []int		// a slice declaration
 s1 := []int{1, 2, 3}	// a slice literal
-s2 := make([]int, 5)	// using built-in make function
+s2 := make([]int, 5)	// using built-in make function with just length
+s3 := make([]int, 5, 10)	// using built-in make function with length and capacity
 {{</highlight>}}
+
+Here **s1** creates a slice of length 3 and capacity 3, with values filled in. **s2** is a slice with length 5 and capacity 5; while **s3** is a slice with length 5 and capacity 10.
 
 There are 3 ways to create a slice:
 
