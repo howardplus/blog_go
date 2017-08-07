@@ -2,8 +2,8 @@ baseurl = "http://go.programmingandlife.com/"
 languageCode = "en-us"
 title = "Learning Go: A C Programmer's Perspective"
 theme = "hugo-lithium-theme"
-googleAnalytics = ""
-disqusShortname = ""
+googleAnalytics = "UA-81852339-3"
+disqusShortname = "GoProgrammingFromC"
 
 [permalinks]
     post = "/:year/:month/:day/:title/"
