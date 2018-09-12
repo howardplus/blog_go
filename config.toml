@@ -1,4 +1,4 @@
-baseurl = "http://go.programmingandlife.com/"
+baseurl = "https://go.programmingandlife.com/"
 languageCode = "en-us"
 title = "Learning Go: A C Programmer's Perspective"
 theme = "hugo-lithium-theme"
